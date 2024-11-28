@@ -1,0 +1,23 @@
+
+.header{
+    background-color: aquamarine;
+    padding: 20px;;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white
+}
+
+.logo{
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.sidebar{
+    display: flex;
+    gap: 20px;
+}
+
+h1{
+    margin-top: 20px;
+}

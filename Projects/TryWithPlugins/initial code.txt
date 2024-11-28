@@ -1,0 +1,825 @@
+import { Text } from '@angular/compiler';
+import { Component, ElementRef, EventEmitter, OnInit, Output, ViewChild } from '@angular/core';
+import jspreadsheet from 'jspreadsheet';
+import jSuites from 'jsuites';
+import { range } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+
+
+const HTML = {
+  updateCell: function (cell, value, x, y, instance) {
+    // value = Number(value) || 0;
+    // if (cell) {
+    //   cell.innerText = value + '%';
+    // }
+    value = value || "";
+    if (cell) {
+      cell.innerHTML = "<div><strong>" + value + "<strong></div>"
+    }
+    return value;
+  },
+  createCell: function (cell, value, x, y, instance) {
+    value = value || "";
+    if (cell) {
+      cell.innerHTML = "<div><strong>" + value + "<strong></div>"
+    }
+    return value;
+  },
+  openEditor: function (cell, value, x, y, instance) {
+    instance.parent.input.onblur = function () {
+      instance.closeEditor(cell, true);
+    };
+    if (value) {
+      instance.parent.input.innerText = value;
+    }
+    jSuites.focus(instance.parent.input);
+  },
+  closeEditor: function (cell, save, x, y, instance) {
+    let value;
+    if (save) {
+      value = instance.parent.input.innerText;
+    } else {
+      value = '';
+    }
+
+    return value;
+  },
+  get: function (options, val) {
+    return val;
+  }
+}
+const RADIO = {
+  handleChange: function (event, x, y) {
+    const val = event.target.value;
+    console.log(`Radio value changed for cell (${x}, ${y}): ${val}`);
+  },
+
+  updateCell: function (cell, value, x, y, instance) {
+    console.log("updateCell function ran");
+
+    value = value || "";
+
+    if (cell) {
+      // Create a new div element
+      const container = document.createElement('div');
+
+      // Create radio buttons
+      const yesRadio = document.createElement('input');
+      yesRadio.type = 'radio';
+      yesRadio.name = `xyz${y}`;
+      yesRadio.value = 'Yes';
+      yesRadio.checked = (value === 'Yes');
+      yesRadio.addEventListener('change', (event) => this.handleChange(event, x, y));
+
+      const noRadio = document.createElement('input');
+      noRadio.type = 'radio';
+      noRadio.name = `xyz${y}`;
+      noRadio.value = 'No';
+      noRadio.checked = (value === 'No');
+      noRadio.addEventListener('change', (event) => this.handleChange(event, x, y));
+
+      // Append radio buttons to the container
+      container.appendChild(yesRadio);
+      container.appendChild(document.createTextNode('Yes'));
+      container.appendChild(document.createElement('br'));
+      container.appendChild(noRadio);
+      container.appendChild(document.createTextNode('No'));
+
+      // Clear previous content and append the new container
+      cell.innerHTML = ''; // Clear existing content
+      cell.appendChild(container);
+    }
+  },
+
+  createCell: function (cell, value, x, y, instance) {
+    return this.updateCell(cell, value, x, y, instance);;
+  },
+
+  openEditor: function (cell, value, x, y, instance) {
+    console.log("function ran")
+    instance.parent.input.onblur = function () {
+
+      console.log(`Blur event triggered for cell (${x}, ${y})`);
+      instance.closeEditor(cell, true);
+    };
+    const radios = cell.getElementsByTagName('input');
+    for (const radio of radios) {
+      if (radio.value === value) {
+        radio.checked = true;
+      }
+      radio.addEventListener('change', (event) => this.handleChange(event, x, y));
+    }
+    this.updateCell(cell, value, x, y, instance);
+
+    jSuites.focus(instance.parent.input);
+  },
+  closeEditor: function (cell, save, x, y, instance) {
+
+    console.log("function ran")
+    let value;
+    if (save) {
+      const radios = cell.getElementsByTagName('input');
+      for (const radio of radios) {
+        if (radio.checked) {
+          value = radio.value; // Get the value of the selected radio button
+          console.log(`Selected value in cell (${x}, ${y}): ${value}`);
+          break;
+        } else {
+          console.log(`Editor closed without saving for cell (${x}, ${y})`);
+        }
+      }
+    }
+
+    return value;
+  },
+
+  get: function (options, val) {
+
+    return val;
+  }
+}
+const CHECKBOX = {
+  handleChange: function (event: any, x, y) {
+    const val = event.target.value;
+    // console.log(event.target)
+    console.log(`Checkbox value changed for cell (${x}, ${y}): ${val}`);
+  },
+  updateCell: function (cell, value, x, y, instance) {
+    value = value || "";
+
+    if (cell) {
+      // Create a new div element
+      const container = document.createElement('div');
+
+      // Create checkbox for "Completed"
+      const completedCheckbox = document.createElement('input');
+      completedCheckbox.type = 'checkbox';
+      completedCheckbox.name = `Yes${y}`;
+      completedCheckbox.value = 'Yes'
+      completedCheckbox.checked = (value === 'Yes');
+      completedCheckbox.addEventListener('change', (event) => this.handleChange(event, x, y));
+
+      // Create checkbox for "Not Completed"
+      // const notCompletedCheckbox = document.createElement('input');
+      // notCompletedCheckbox.type = 'checkbox';
+      // notCompletedCheckbox.name = `Not Completed${y}`;
+      // notCompletedCheckbox.value = 'Not Completed'
+      // notCompletedCheckbox.checked = (value === 'Not Completed');
+      // notCompletedCheckbox.addEventListener('change', (event) => this.handleChange(event, x, y));
+
+      // Append checkboxes to the container
+      container.appendChild(completedCheckbox);
+      container.appendChild(document.createTextNode('Yes'));
+      // container.appendChild(document.createElement('br'));
+      // container.appendChild(notCompletedCheckbox);
+      // container.appendChild(document.createTextNode('Not Completed'));
+
+      // Clear previous content and append the new container
+      cell.innerHTML = ''; // Clear existing content
+      cell.appendChild(container);
+    }
+  },
+  createCell: function (cell, value, x, y, instance) {
+
+    return this.updateCell(cell, value, x, y, instance);
+  },
+  openEditor: function (cell, value, x, y, instance) {
+    console.log(instance.parent);
+    instance.parent.input.onblur = function () {
+
+      instance.closeEditor(cell, true);
+    };
+    if (value) {
+      instance.parent.input.innerText = value;
+    }
+    console.log("checked value ", value)
+    jSuites.focus(instance.parent.input);
+  },
+  closeEditor: function (cell, save, x, y, instance) {
+    let value;
+    if (save) {
+      value = instance.parent.input.innerText;
+    } else {
+      value = '';
+    }
+
+    return value;
+  },
+  get: function (options, val) {
+    return val;
+  }
+}
+
+const custom = {
+  handleChange: function (event, x, y) {
+    if (event.target.checked) {
+      const val = event.target.value; // Changed to checked for checkbox
+      console.log(`Checkbox value changed for cell (${x}, ${y}): ${val}`);
+    }
+  },
+
+  createCheckbox: function (name, value, checked, x, y, container, instance) {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.name = name;
+    checkbox.value = value;
+    checkbox.checked = checked;
+    checkbox.addEventListener('change', (event) => this.handleChange(event, x, y));
+    container.appendChild(checkbox);
+    container.appendChild(document.createTextNode(value)); // Label for the checkbox
+  },
+
+  updateCell: function (cell, value, x, y, instance, name, checkboxValue) {
+    value = value || "";
+
+    if (cell) {
+      const container = document.createElement('div');
+      this.createCheckbox(name, checkboxValue, (value === checkboxValue), x, y, container, instance);
+      cell.innerHTML = ''; // Clear existing content
+      cell.appendChild(container);
+    }
+  },
+
+  createCell: function (cell, value, x, y, instance, name, checkboxValue) {
+    // console.log(name)
+    return this.updateCell(cell, value, x, y, instance, name, checkboxValue);
+  },
+
+  openEditor: function (cell, value, x, y, instance) {
+    instance.parent.input.onblur = () => {
+      instance.closeEditor(cell, true);
+    };
+    if (value) {
+      instance.parent.input.innerText = value;
+      // console.log(instance.parent)
+    }
+    jSuites.focus(instance.parent.input);
+  },
+
+  closeEditor: function (cell, save, x, y, instance) {
+    let value;
+    if (save) {
+      // console.log(instance.parent);
+      value = instance.parent.input.innerText;
+    } else {
+      value = '';
+    }
+    return value;
+  },
+
+  get: function (options, val) {
+    return val;
+  }
+}
+
+const Editor = {
+  updateCell: function (cell, value, x, y, instance) {
+    value = Number(value) || 0;
+    if (cell) {
+      cell.innerText = value + '%';
+    }
+    return value / 100;
+  },
+  createCell: function (cell, value, x, y, instance) {
+    value = Number(value) || 0;
+    if (cell) {
+      cell.innerText = value + '%';
+    }
+    return value / 100;
+  },
+  openEditor: function (cell, value, x, y, instance) {
+    console.log("Editor open")
+    console.log(instance.parent.input);
+    instance.parent.input.onblur = function () {
+      instance.closeEditor(cell, true);
+    };
+    if (value) {
+      instance.parent.input.innerText = (Number(value)) * 100;
+    }
+    jSuites.focus(instance.parent.input);
+  },
+  closeEditor: function (cell, save, x, y, instance) {
+    console.log("Editor close")
+    console.log(instance);
+    let value;
+    if (save) {
+      value = Number(instance.parent.input.innerText);
+    } else {
+      value = '';
+    }
+
+    return value;
+  },
+  get: function (options, val) {
+    return (val * 100) + '%';
+  }
+}
+
+const customDropdown = {
+  // Handle dropdown change
+  handleChange: function (event, x, y) {
+    const val = event.target.value; // Get the selected value
+    console.log(`Dropdown value changed for cell (${x}, ${y}): ${val}`);
+  },
+
+  // Create a dropdown select element
+  createDropdown: function (name, options, selectedValue, x, y, container) {
+    const select = document.createElement('select');
+    select.name = name;
+
+    // Populate the dropdown with options
+    options.forEach(option => {
+      const opt = document.createElement('option');
+      opt.value = option.value; // Option value
+      opt.textContent = option.label; // Option label
+      opt.selected = option.value === selectedValue; // Set selected option
+      select.appendChild(opt);
+    });
+
+    // Attach the change event listener with x and y
+    select.addEventListener('change', (event) => this.handleChange(event, x, y));
+    container.appendChild(select); // Append the dropdown to the container
+  },
+
+  // Update the cell content with a dropdown
+  updateCell: function (cell, value, x, y, options) {
+    value = value || ""; // Default to empty string if value is falsy
+
+    if (cell) {
+      const container = document.createElement('div');
+      this.createDropdown('customDropdown', options, value, x, y, container);
+      cell.innerHTML = ''; // Clear existing content
+      cell.appendChild(container); // Add the dropdown container to the cell
+    }
+  },
+
+  // Create a cell and populate it with a dropdown
+  createCell: function (cell, value, x, y, options) {
+    return this.updateCell(cell, value, x, y, options);
+  },
+
+  // Get the selected value from the dropdown in a specific cell
+  get: function (cell) {
+    const select = cell.querySelector('select[name="customDropdown"]');
+    return select ? select.value : null; // Return the selected value or null if not found
+  }
+};
+
+
+@Component({
+
+  selector: 'app-root',
+  // templateUrl: './app.component.html',
+  template: `
+  <div #spreadsheet></div> &nbsp;&nbsp;&nbsp;
+  <button (click)="lockSheet()"> {{ isLocked ? 'Design Mode' : 'Test Mode' }}</button>
+  
+  
+  <br/>
+  
+  <!-- <button (click)="toggleToolbar()">Toggle Toolbar</button> -->
+  <!-- <input type="button" value="setRowGroup(0,3)" (click)="this.worksheets[0].setRowGroup(0,2)" /> -->
+  <!-- <input type="button" value="resetRowGroup(0)" (click)="this.worksheets[0].resetRowGroup(0);" /> -->
+  <!-- <input type="button" value="setColumnGroup(0,3)" (click)="this.worksheets[0].setColumnGroup(0,3)" /> -->
+  <!-- <input type="button" value="resetColumnGroup(0)" (click)="this.worksheets[0].resetColumnGroup(0);" /> -->
+  
+   `,
+
+  styleUrls: ['./app.component.scss']
+})
+export class AppComponent {
+  title = 'Jspreadsheet';
+  @ViewChild("spreadsheet")
+
+  spreadsheet: ElementRef | undefined;
+  worksheets: jspreadsheet.worksheetInstance[] = [];
+  // worksheets: any;
+
+  toolbarVisible: boolean = true; // State to track toolbar visibility
+  isTestMode: boolean = false; // State for test mode
+  isLocked: boolean = false;
+
+
+  ngAfterViewInit() {
+    console.log("Initializing sheet...");
+    console.log(this.spreadsheet); // Check if spreadsheet is defined
+    if (this.spreadsheet) {
+      this.initializeSpreadsheet();
+    } else {
+      console.error("Spreadsheet element is not defined.");
+    }
+  }
+
+  handleRadioChange(event: any) {
+    console.log('Radio change event triggered');
+    const val = event.target.value;
+    console.log(`Radio button selected with value: ${val}`);
+  }
+
+  handleUnload(event: BeforeUnloadEvent) {
+    event.preventDefault();
+    event.returnValue = ''; // Display a warning dialog
+  }
+
+
+  initializeSpreadsheet() {
+    const savedData = localStorage.getItem('spreadsheetData');
+    const initialData = savedData ? JSON.parse(savedData) : [[]];
+
+
+    jspreadsheet.setLicense("Mzk1ZTg2NDQ2ZTlmY2MxNTgyZDc2MTlmZjU1NDc0NTJkOTg3MTJiODA1Nzg3YTMzZjA4YWY2NTMzMWYyZWY5MzViYTgzNjRhZTU4NjIxYzY0ODA5ZmIyNmQxYmYxM2EwNzg2YjAxMjBjMjk1ZjdkMzY2NTU0NjQ0OGM0MmQwNmYsZXlKamJHbGxiblJKWkNJNklqbGxZekUyT1RFNU9HVmtPVFU0T1dKbE4yVmpNMkk1WkRrd09UWmxPR0UyTjJWa1pqSTVPREFpTENKdVlXMWxJam9pUzI5MGJHRWlMQ0prWVhSbElqb3hOek14TWpnek1qQXdMQ0prYjIxaGFXNGlPbHNpZDJWaUlpd2liRzlqWVd4b2IzTjBJbDBzSW5Cc1lXNGlPak14TENKelkyOXdaU0k2V3lKMk55SXNJblk0SWl3aWRqa2lMQ0oyTVRBaUxDSjJNVEVpTENKbWIzSnRkV3hoSWl3aVptOXliWE1pTENKeVpXNWtaWElpTENKd1lYSnpaWElpTENKcGJYQnZjblJsY2lJc0luTmxZWEpqYUNJc0ltTnZiVzFsYm5Seklpd2lkbUZzYVdSaGRHbHZibk1pTENKamFHRnlkSE1pTENKd2NtbHVkQ0lzSW1KaGNpSXNJbk5vWldWMGN5SXNJbk5vWVhCbGN5SXNJbk5sY25abGNpSmRmUT09");
+    // Create spreadsheet
+    // const lockedCells = this.lockRange("A1", "C2");
+    const config: any = {
+
+      worksheets: [
+        {
+          csv: '../assets/default.csv',
+          csvHeaders: true,
+          minDimensions: [9, 25],
+          locked: this.isLocked,
+          columns: [
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            },
+            {
+              type: 'text',
+              width: 100
+            }
+
+          ],
+          mergeCells: {
+            A4: [3, 1], A5: [3, 1], A6: [3, 1], A7: [3, 1], A8: [6, 1], A9: [6, 1], A10: [7, 1], A11: [7, 1], A12: [2, 1], A13: [2, 1], A14: [7, 1], A15: [1, 2], A19: [1, 3],
+            B1: [2, 1], B3: [8, 1], B16: [4, 1],
+            C12: [3, 1], C13: [3, 1], C15: [2, 1], C17: [2, 1],
+            D2: [2, 1], D4: [4, 1], D5: [4, 1], D6: [4, 1], D7: [4, 1], D18: [2, 1], D19: [2, 1], D20: [2, 1], D21: [2, 1], D22: [2, 1], D23: [2, 1],
+            E1: [2, 1], E15: [3, 1],
+            F2: [2, 1], F12: [2, 1], F13: [2, 1], F18: [2, 1], F20: [2, 1], F21: [2, 1], F22: [2, 1], F23: [2, 1],
+            G1: [3, 1], G17: [2, 1],
+            H2: [2, 1], H4: [2, 1], H5: [2, 1], H6: [2, 1], H7: [2, 1], H8: [2, 1], H9: [2, 3], H18: [2, 1],
+            C5: [1, 2],
+          },
+
+          // gridline: false;
+          cells: {
+
+            A5: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              onchange: (value, x, y) => {
+                console.log("ran")
+                console.log(`Selected value in A5: ${value} at cell (${x}, ${y})`);
+              },
+              locked: false
+            },
+            A7: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            A9: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+            },
+            A11: {
+              type: 'dropdown',
+              source: ['bglr', 'chennai', 'goa', 'kerala'],
+              locked: false
+            },
+            A22: {
+              type: 'checkbox'
+            },
+            B2: {
+              type: 'text',
+              render: (cell, value) => {
+                cell.innerHTML = `<div style="display: flex; align-items: center;">
+                  <input type="radio" name="rowGroup" value="Single" (change)="handleRadioChange($event)">
+                  <label style="margin-left: 5px;">Single</label>
+              </div>`
+              }
+            },
+            B16: {
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'spouse itemizes on a separate return or you were a dual-status alien');
+              }
+            },
+            B20: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            B21: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            B22: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            B23: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+
+            C2: {
+              type: 'text',
+              render: (cell, value) => {
+                cell.innerHTML = `<div style="display: flex; align-items: center;">
+                  <input type="radio" name="rowGroup" value="Married filing jointly" (change)="handleRadioChange($event)">
+                  <label style="margin-left: 5px;">Married filing jointly</label>
+              </div>`
+              }
+            },
+            C15: {
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'you as a dependent');
+              }
+            },
+            C17: {
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'were born before january; 1957');
+              }
+            },
+            C20: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            C21: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            C22: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            C23: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+            D2: {
+              type: 'text',
+              render: (cell, value) => {
+                cell.innerHTML = `<div style="display: flex; align-items: center;">
+                  <input type="radio" name="rowGroup" value="Married filing separately" (change)="handleRadioChange($event)">
+                  <label style="margin-left: 5px;">Married filing separately</label>
+              </div>`
+
+              }
+            },
+            D5: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+
+            D7: {
+              type: 'dropdown',
+              source: ['Dora', 'Maribel', 'Gomez', 'Jose'],
+              locked: false
+            },
+
+            D20: {
+              locked: false
+            },
+            D21: {
+              locked: false
+            },
+            D22: {
+              locked: false
+            },
+            D23: {
+              locked: false
+            },
+
+            E15: {
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'your spouse as a dependent');
+              }
+            },
+            E17: {
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'Are blind');
+              }
+            },
+            F2: {
+              type: 'text',
+              render: (cell, value) => {
+                cell.innerHTML = `<div style="display: flex; align-items: center;">
+                  <input type="radio" name="rowGroup" value="Head of household" (change)="handleRadioChange($event)">
+                  <label style="margin-left: 5px;">Head of household</label>
+              </div>`;
+              }
+            },
+            F20: {
+              type: 'dropdown',
+              source: ['Daughter', 'Son'],
+              locked: false
+            },
+            F21: {
+              type: 'dropdown',
+              source: ['Daughter', 'Son'],
+              locked: false
+            },
+            F22: {
+              type: 'dropdown',
+              source: ['Daughter', 'Son'],
+              locked: false
+            },
+            F23: {
+              type: 'dropdown',
+              source: ['Daughter', 'Son'],
+              locked: false
+            },
+            G17: {
+              type: custom,
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'was born before January 2,1957');
+              }
+            },
+            H2: {
+              type: 'text',
+              render: (cell, value) => {
+                cell.innerHTML = `<div style="display: flex; align-items: center;">
+                  <input type="radio" name="rowGroup" value="Qualifying widow" (change)="handleRadioChange($event)">
+                  <label style="margin-left: 5px;">Qualifying widow</label>
+              </div>`;
+              }
+            },
+            H5: {
+              locked: false
+            },
+            H7: {
+              locked: false
+            },
+            H12: {
+              type: custom,
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'You');
+              }
+            },
+            H14: {
+              type: custom,
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'Yes');
+              }
+            },
+            H20: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            H21: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            H22: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            H23: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            I12: {
+              type: custom,
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'Spouse');
+              }
+            },
+            I17: {
+              type: custom,
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'Is bind');
+              }
+            },
+            I20: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            I21: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            I22: {
+              type: 'checkbox',
+              locked: false
+
+            },
+            I23: {
+              type: 'checkbox',
+              locked: false
+
+            },
+
+            I14: {
+              type: custom,
+              render: (cell, value, x, y, instance) => {
+                custom.createCell(cell, value, x, y, instance, `Checkbox${y}`, 'No');
+              }
+            },
+
+            locked: this.isLocked,
+
+
+          }
+        }
+
+      ],
+
+      toolbar: this.toolbarVisible,
+
+    }
+
+
+    this.worksheets = jspreadsheet(this.spreadsheet?.nativeElement, config);
+
+  }
+
+
+  unlockRange(start: string, end: string): { [key: string]: { locked: boolean } } {
+    const cells: { [key: string]: { locked: boolean } } = {};
+    const startRow = parseInt(start.slice(1));
+    const endRow = parseInt(end.slice(1));
+    const startCol = start.charCodeAt(0);
+    const endCol = end.charCodeAt(0);
+
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startCol; col <= endCol; col++) {
+        const cell = String.fromCharCode(col) + row;
+        cells[cell] = { locked: false };
+      }
+    }
+
+    return cells;
+  }
+
+  lockRange(start: string, end: string): { [key: string]: { locked: boolean } } {
+    const cells: { [key: string]: { locked: boolean } } = {};
+    const startRow = parseInt(start.slice(1));
+    const endRow = parseInt(end.slice(1));
+    const startCol = start.charCodeAt(0);
+    const endCol = end.charCodeAt(0);
+
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startCol; col <= endCol; col++) {
+        const cell = String.fromCharCode(col) + row;
+        cells[cell] = { locked: true }; // Lock these cells
+      }
+    }
+
+    return cells;
+  }
+
+
+  lockSheet() {
+    //this.jspreadsheet.de
+    jspreadsheet.destroyAll();
+    this.isLocked = !this.isLocked;
+    this.toolbarVisible = !this.isLocked;
+    this.initializeSpreadsheet();
+    console.log(this.isLocked);
+
+  }
+
+}
